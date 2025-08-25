@@ -1,6 +1,6 @@
 
 <div align="center">
-  <img src="https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif" alt="Proxy Bot" width="250">
+  <img src="https://i.postimg.cc/jq6zrVdk/toolxox-com-iconscout-Sbvjl.png" alt="Proxy Bot" width="250">
   
   # 🛡️ **Telegram Proxy Checker Bot**
   **Fast, Async & Beautiful Proxy Checking with Admin Controls**
@@ -164,6 +164,7 @@ The developer is not responsible for any misuse or account issues.`
 
 
 </details>
+
 ---
 
 <div align="center">
@@ -187,6 +188,5 @@ The developer is not responsible for any misuse or account issues.`
 
  ### <em>⚡ Fast. Async. Admin-controlled. Beautiful. ⚡</em>
 </p>
-```
 
 ---
