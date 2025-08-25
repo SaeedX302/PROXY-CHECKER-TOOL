@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import geoip2.database
 from aiogram.filters import Command
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F  # F ko yahan import kiya gaya hai
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -95,7 +95,7 @@ async def process_proxies(proxies, message: types.Message):
     stop_flag = False
     proxy_types = ['http', 'https', 'socks4', 'socks5']
 
-    await message.answer("✅ Starting proxy check...")
+    await message.answer("✅ Checking proxies shuru ho rahi hai...")
     progress_msg = await message.answer("🔍 Progress: [                    ] 0%")
 
     async def check_and_update(proxy, proxy_type):
@@ -110,7 +110,10 @@ async def process_proxies(proxies, message: types.Message):
             processed += 1
             percent = int((processed / total) * 100)
             bar = "█" * (percent // 5) + " " * (20 - percent // 5)
-            await progress_msg.edit_text(f"🔍 Progress: [{bar}] {percent}%")
+            try:
+                await progress_msg.edit_text(f"🔍 Progress: [{bar}] {percent}%")
+            except: # Ignore message not modified error
+                pass
 
             if result:
                 t = result['type']
@@ -120,7 +123,7 @@ async def process_proxies(proxies, message: types.Message):
                     country_proxies[country_key] = []
                 country_proxies[country_key].append(result['proxy'])
 
-    await message.answer(f"✅ Done! {sum(len(v) for v in working_proxies.values())} working proxies found.")
+    await message.answer(f"✅ Kaam ho gaya! {sum(len(v) for v in working_proxies.values())} working proxies mil gayin.")
     await save_results(message)
 
 
@@ -136,43 +139,46 @@ async def save_results(message: types.Message):
 
 
 def main_keyboard():
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        InlineKeyboardButton("✅ Help", callback_data="help"),
-        InlineKeyboardButton("🛑 Stop", callback_data="stop"),
-        InlineKeyboardButton("📊 Uptime", callback_data="uptime")
-    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Help", callback_data="help"),
+            InlineKeyboardButton(text="🛑 Stop", callback_data="stop")
+        ],
+        [
+            InlineKeyboardButton(text="📊 Uptime", callback_data="uptime")
+        ]
+    ])
     return kb
 
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     user_data["users"].add(message.from_user.id)
-    await message.answer("👋 **Welcome to Proxy Checker Bot**\nSend a `.txt` file with proxies to check.",
+    await message.answer("👋 **Proxy Checker Bot mein Khush Amdeed**\nCheck karne ke liye proxies wali `.txt` file send karein.",
                          reply_markup=main_keyboard(), parse_mode="Markdown")
 
 
-@dp.callback_query(lambda c: c.data == 'help')
+@dp.callback_query(F.data == 'help')
 async def show_help(callback_query: types.CallbackQuery):
     text = (
         "📌 **Available Commands:**\n\n"
-        "✅ `/start` - Start the bot\n"
-        "✅ `/help` - Show this help message\n"
-        "✅ `/stop` - Stop checking process\n"
-        "✅ `/up` - Show bot uptime\n"
-        "\nℹ️ Upload a `.txt` file with proxies in `IP:PORT` format."
+        "✅ `/start` - Bot ko start karein\n"
+        "✅ `/help` - Madad ke liye yeh message dekhein\n"
+        "✅ `/stop` - Checking ka process rokein\n"
+        "✅ `/up` - Bot ka uptime dekhein\n"
+        "\nℹ️ `IP:PORT` format mein proxies wali `.txt` file upload karein."
     )
     await callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_keyboard())
 
 
-@dp.callback_query(lambda c: c.data == 'stop')
+@dp.callback_query(F.data == 'stop')
 async def stop_process(callback_query: types.CallbackQuery):
     global stop_flag
     stop_flag = True
-    await callback_query.message.answer("⛔ Stopping process...")
+    await callback_query.message.answer("⛔ Process roka ja raha hai...")
 
 
-@dp.callback_query(lambda c: c.data == 'uptime')
+@dp.callback_query(F.data == 'uptime')
 async def show_uptime(callback_query: types.CallbackQuery):
     now = datetime.now()
     uptime = now - start_time
@@ -182,13 +188,18 @@ async def show_uptime(callback_query: types.CallbackQuery):
     seconds = seconds % 60
 
     await callback_query.message.answer(
-        f"✅ **Bot Uptime:** {days}d {hours}h {minutes}m {seconds}s",
+        f"✅ **Bot Uptime:** {days} din, {hours} ghante, {minutes} minute, {seconds} second",
         parse_mode="Markdown"
     )
 
 
-@dp.message(content_types=['document'])
+# Yeh raha ahem change
+@dp.message(F.document)
 async def handle_file(message: types.Message):
+    if not message.document.file_name.endswith('.txt'):
+        await message.answer("Janab, sirf `.txt` file hi qubool ki jayegi.")
+        return
+
     file = await message.document.get_file()
     file_path = f"downloads/{message.document.file_name}"
     os.makedirs("downloads", exist_ok=True)
@@ -210,5 +221,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
