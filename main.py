@@ -1,6 +1,5 @@
 import os
 import time
-import socket
 import asyncio
 import aiohttp
 import geoip2.database
@@ -9,6 +8,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from datetime import datetime
 from dotenv import load_dotenv
+from aiogram.exceptions import TelegramRetryAfter
 
 # --- Environment Variables ---
 load_dotenv()
@@ -36,45 +36,34 @@ error_log = "error.log"
 
 # --- Core Functions ---
 async def log_error(msg):
-    # This function logs errors to a file for debugging.
     async with asyncio.Lock():
         with open(error_log, 'a') as f:
             f.write(f"[{datetime.now()}] - {msg}\n")
 
 async def check_proxy(proxy_line: str, session: aiohttp.ClientSession):
-    # This is the main function to check a single proxy.
     proxy_line = proxy_line.strip()
     if ':' not in proxy_line:
         return None
 
     ip, port, *rest = proxy_line.split(':')
-    proxy_url = f"http://{ip}:{port}" # Check as HTTP, it often works for SOCKS too for this test
+    proxy_url = f"http://{ip}:{port}"
 
     try:
-        # We test the proxy by trying to fetch our IP from ipify.org through it
         async with session.get('https://api.ipify.org', proxy=proxy_url, timeout=10) as resp:
             if resp.status == 200:
-                country = 'Unknown'
-                if geoip_reader:
-                    try:
-                        country = geoip_reader.country(ip).country.name
-                    except geoip2.errors.AddressNotFoundError:
-                        pass
-                return {'proxy': proxy_line, 'country': country}
+                return {'proxy': proxy_line}
     except Exception:
-        # Most proxies will fail, so we don't log every single failure.
         pass
     return None
 
 async def process_proxies(proxies: list, message: types.Message):
-    # This function manages the whole process of checking a list of proxies.
     working_proxies = []
     
     await message.answer(f"✅ Aapki {len(proxies)} proxies ko check karna shuru kar diya hai...")
     progress_msg = await message.answer("🔍 Progress: [                    ] 0%")
+    last_update_time = time.time()
 
     tasks = []
-    # Create one session for all requests for better performance.
     async with aiohttp.ClientSession() as session:
         for proxy in proxies:
             tasks.append(check_proxy(proxy, session))
@@ -85,13 +74,17 @@ async def process_proxies(proxies: list, message: types.Message):
             result = await future
             processed += 1
             
-            # Update progress bar less frequently to avoid Telegram API rate limits.
-            if processed % 25 == 0 or processed == total:
+            # Flood Control Fix: Update progress bar only every 2 seconds
+            current_time = time.time()
+            if current_time - last_update_time > 2 or processed == total:
                 percent = int((processed / total) * 100)
                 bar = "█" * (percent // 5) + " " * (20 - percent // 5)
                 try:
                     await progress_msg.edit_text(f"🔍 Progress: [{bar}] {percent}% ({processed}/{total})")
-                except: # Ignore "message is not modified" error
+                    last_update_time = current_time
+                except TelegramRetryAfter as e:
+                    await asyncio.sleep(e.retry_after) # Wait if we still get a flood error
+                except Exception: # Ignore other errors like "message not modified"
                     pass
 
             if result:
@@ -103,18 +96,16 @@ async def process_proxies(proxies: list, message: types.Message):
 
     await message.answer(f"🎉 Mubarak! {len(working_proxies)} working proxies mil gayin.")
     
-    # Save results to a file and send to the user.
-    filename = f"working_proxies_{int(time.time())}.txt"
+    filename = f"valid_proxy_{int(time.time())}.txt"
     with open(filename, 'w') as f:
         f.write('\n'.join(working_proxies))
     
-    await message.answer_document(InputFile(filename), caption="✨ Yeh rahi aapki fresh working proxies!")
+    await message.answer_document(InputFile(filename), caption="✨ Yeh rahi aapki fresh & valid proxies!")
     if AUTO_CLEANUP:
         os.remove(filename)
 
 async def fetch_free_proxies():
-    # Fetches a list of free proxies from an API.
-    url = "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
+    url = "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -143,12 +134,7 @@ async def start_cmd(message: types.Message):
 
 @dp.callback_query(F.data == 'help')
 async def show_help(callback_query: types.CallbackQuery):
-    text = (
-        "**Kaise Istemaal Karein?**\n\n"
-        "1️⃣ **Custom Proxies**: Apni `IP:PORT` format mein proxies wali `.txt` file is chat mein send karein.\n\n"
-        "2️⃣ **Free Proxies**: `🌐 Free Proxies` ka button dabayein. Bot online sources se proxies hasil karke unhe check karega aur working proxies aapko bhej dega.\n\n"
-        "Bot tamam proxies ko check karega aur aakhir mein working proxies ki ek file aapko send kar dega."
-    )
+    text = "**Kaise Istemaal Karein?**\n\n1️⃣ **Custom Proxies**: Apni `IP:PORT` format mein proxies wali `.txt` file is chat mein send karein.\n\n2️⃣ **Free Proxies**: `🌐 Free Proxies` ka button dabayein."
     await callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_keyboard())
     await callback_query.answer()
 
@@ -175,16 +161,18 @@ async def handle_file(message: types.Message):
         await message.answer("❗️ File `.txt` format mein honi chahiye.")
         return
 
-    file = await message.document.get_file()
+    # AttributeError Fix: This is the correct way to get the file object
+    file_info = await bot.get_file(message.document.file_id)
+    
     file_path = f"downloads/{message.document.file_name}"
     os.makedirs("downloads", exist_ok=True)
-    await bot.download_file(file.file_path, destination=file_path)
+    await bot.download_file(file_info.file_path, destination=file_path)
 
     with open(file_path, 'r') as f:
         proxies = [line.strip() for line in f if line.strip()]
 
     if AUTO_CLEANUP:
-        os.remove(file_path)
+        os.remove(filename)
     
     if proxies:
         await process_proxies(proxies, message)
@@ -193,7 +181,6 @@ async def handle_file(message: types.Message):
 
 # --- Main Execution ---
 async def on_startup(bot: Bot):
-    # This is the important fix for deployment.
     await bot.delete_webhook(drop_pending_updates=True)
     print("--- Bot Started Successfully ---")
 
