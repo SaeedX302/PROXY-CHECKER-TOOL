@@ -88,7 +88,7 @@ Users interact via Telegram commands, inline buttons, and can view proxy stats e
 
 ### 5. Run the bot
 
-    python bot.py
+    python main.py
 
 > `⚠️ Ensure GeoLite2-Country.mmdb is present in the root directory for country detection.`
 
