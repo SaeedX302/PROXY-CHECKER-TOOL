@@ -3,7 +3,7 @@ import time
 import socket
 import asyncio
 import aiohttp
-import geoip2.databas
+import geoip2.database
 from aiogram.filters import Command
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
@@ -210,4 +210,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
