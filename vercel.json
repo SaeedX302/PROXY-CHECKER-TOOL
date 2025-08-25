@@ -6,15 +6,9 @@
       "use": "@vercel/python"
     }
   ],
-  "env": {
-    "BOT_TOKEN": "YOUR_BOT_TOKEN_HERE",
-    "ADMIN_IDS": "123456789,987654321",
-    "GEOIP_DB_PATH": "GeoLite2-Country.mmdb",
-    "AUTO_CLEANUP": "True"
-  },
   "routes": [
     {
-      "src": "/.*",
+      "src": "/(.*)",
       "dest": "main.py"
     }
   ]
