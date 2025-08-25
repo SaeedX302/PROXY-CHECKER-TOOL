@@ -1,0 +1,8 @@
+python-telegram-bot==20.5
+requests==2.31.0
+pysocks==1.7.1
+geoip2==4.8.0
+colorama==0.4.6
+tqdm==4.65.0
+keyboard==0.13.5
+asyncio==3.4.3

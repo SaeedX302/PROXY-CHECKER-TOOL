@@ -1,0 +1,21 @@
+# render.yaml for Telegram Proxy Checker Bot
+services:
+  - type: web
+    name: telegram-proxy-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        fromDatabase: false
+        value: YOUR_BOT_TOKEN_HERE
+      - key: ADMIN_IDS
+        fromDatabase: false
+        value: 123456789,987654321
+      - key: GEOIP_DB_PATH
+        fromDatabase: false
+        value: GeoLite2-Country.mmdb
+      - key: AUTO_CLEANUP
+        fromDatabase: false
+        value: "True"
