@@ -3,7 +3,8 @@ import time
 import socket
 import asyncio
 import aiohttp
-import geoip2.database
+import geoip2.databas
+from aiogram.filters import Command
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from datetime import datetime
@@ -144,7 +145,7 @@ def main_keyboard():
     return kb
 
 
-@dp.message(commands=['start'])
+@dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     user_data["users"].add(message.from_user.id)
     await message.answer("👋 **Welcome to Proxy Checker Bot**\nSend a `.txt` file with proxies to check.",
@@ -209,3 +210,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
